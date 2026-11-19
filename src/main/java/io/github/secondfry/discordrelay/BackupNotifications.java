@@ -15,6 +15,7 @@ final class BackupNotifications implements IClientContactor {
     private final Consumer<String> post;
     private long lastAge = -1;
     private BackupStatusInstance.State lastState;
+    private boolean announced;
     private boolean disabled;
 
     BackupNotifications(IClientContactor delegate, Consumer<String> post) {
@@ -23,13 +24,9 @@ final class BackupNotifications implements IClientContactor {
     }
 
     static void install(DiscordBridge bridge) {
-        try {
-            IClientContactor original = ABCore.clientContactor;
-            if (original == null || original instanceof BackupNotifications) return;
-            ABCore.clientContactor = new BackupNotifications(original, bridge::server);
-        } catch (LinkageError | RuntimeException failure) {
-            DiscordRelay.LOG.warn("AdvancedBackups relay disabled after an integration error", failure);
-        }
+        IClientContactor original = ABCore.clientContactor;
+        if (original == null || original instanceof BackupNotifications) return;
+        ABCore.clientContactor = new BackupNotifications(original, bridge::server);
     }
 
     @Override
@@ -47,17 +44,20 @@ final class BackupNotifications implements IClientContactor {
     private void relay(BackupStatusInstance instance) {
         BackupStatusInstance.State state = instance.getState();
         // BackupTimer re-sends the current instance, so post once per published instance.
-        if (instance.getAge() == lastAge && state == lastState) return;
+        if (state == BackupStatusInstance.State.INVALID || instance.getAge() == lastAge && state == lastState) return;
         lastAge = instance.getAge();
         lastState = state;
-        String text = message(state);
-        if (text != null) post.accept(text);
+        // STARTING can be replaced by STARTED within one tick, so announce on the first state seen.
+        if (!announced) post.accept("Server backup started.");
+        announced = true;
+        String text = finished(state);
+        if (text == null) return;
+        announced = false;
+        post.accept(text);
     }
 
-    private static String message(BackupStatusInstance.State state) {
+    private static String finished(BackupStatusInstance.State state) {
         switch (state) {
-            case STARTING:
-                return "Server backup started.";
             case COMPLETE:
                 return "Server backup done." + stats();
             case FAILED:

@@ -108,7 +108,13 @@ public final class DiscordRelay {
         if (bridge == null) return;
         heartbeat.enter(ServerHeartbeat.Phase.RUNNING, System.nanoTime());
         // AdvancedBackups sets its contactor in FMLServerStartingEvent, so every mod's starting handler has run by now.
-        if (Loader.isModLoaded("advancedbackups")) BackupNotifications.install(bridge);
+        if (Loader.isModLoaded("advancedbackups")) {
+            try {
+                BackupNotifications.install(bridge);
+            } catch (LinkageError | RuntimeException failure) {
+                LOG.warn("AdvancedBackups relay disabled after an integration error", failure);
+            }
+        }
         bridge.server("Minecraft server started.");
     }
 
