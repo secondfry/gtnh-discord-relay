@@ -1,8 +1,6 @@
 package io.github.secondfry.discordrelay;
 
 import java.util.Collections;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.entities.IncomingWebhookClient;
@@ -24,23 +22,15 @@ final class DiscordWebhook {
         client = WebhookClient.createClient(session, url);
     }
 
-    boolean send(String player, String text) throws InterruptedException {
+    boolean send(String player, String text) {
         if (disabled) return false;
         try {
             WebhookMessageCreateAction<Message> request = client.sendMessage(truncate(text))
                 .setUsername(player == null ? SERVER_NAME : player.replaceAll("(?i)cly(?=de)|dis(?=cord)", "$0\u200B"))
                 .setAllowedMentions(Collections.emptySet());
             if (player != null) request.setAvatarUrl("https://minotar.net/helm/" + player + "/64");
-            CompletableFuture<Message> result = request.submit();
-            try {
-                result.get();
-                return true;
-            } catch (InterruptedException interrupted) {
-                result.cancel(false);
-                throw interrupted;
-            }
-        } catch (ExecutionException failure) {
-            handleFailure(failure.getCause());
+            request.complete();
+            return true;
         } catch (RuntimeException | LinkageError failure) {
             handleFailure(failure);
         }

@@ -2,6 +2,7 @@ package io.github.secondfry.discordrelay;
 
 import java.nio.file.Path;
 
+import net.dv8tion.jda.api.entities.Webhook;
 import net.minecraftforge.common.config.Configuration;
 
 final class RelayConfig {
@@ -42,7 +43,8 @@ final class RelayConfig {
     }
 
     boolean hasRequiredSettings() {
-        return !botToken.isEmpty() && webhookUrl.matches("https://discord\\.com/api/webhooks/[0-9]{17,20}/[\\w-]+");
+        return !botToken.isEmpty() && Webhook.WEBHOOK_URL.matcher(webhookUrl)
+            .matches();
     }
 
     static boolean validChannelId(String channel) {

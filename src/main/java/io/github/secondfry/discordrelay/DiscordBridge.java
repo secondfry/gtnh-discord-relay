@@ -28,10 +28,11 @@ final class DiscordBridge {
     private final CountDownLatch stopping = new CountDownLatch(1);
     private final CountDownLatch finished = new CountDownLatch(1);
     private final ThreadPoolExecutor accountWorker;
-    private final boolean inboundConfigured;
+    private final String inputChannelId;
     private final ServerHeartbeat heartbeat;
     private final Thread shutdownHook;
     private volatile AccountLinks links;
+    private volatile JDA session;
     private volatile boolean closed;
 
     DiscordBridge(RelayConfig config, ServerHeartbeat heartbeat) {
@@ -41,13 +42,13 @@ final class DiscordBridge {
                 DiscordRelay.LOG
                     .error("Discord Relay requires botToken and a valid webhookUrl in {}.", config.settingsFile);
             }
-            inboundConfigured = false;
+            inputChannelId = null;
             accountWorker = null;
             shutdownHook = null;
             return;
         }
-        inboundConfigured = RelayConfig.validChannelId(config.inputChannelId);
-        if (!inboundConfigured) {
+        inputChannelId = RelayConfig.validChannelId(config.inputChannelId) ? config.inputChannelId : null;
+        if (inputChannelId == null) {
             DiscordRelay.LOG.warn(
                 "Discord chat and slash commands need a valid input channel ID. Starting outbound delivery only.");
         }
@@ -62,8 +63,7 @@ final class DiscordBridge {
         shutdownHook = daemon("Discord Relay shutdown", this::onJvmShutdown);
         Runtime.getRuntime()
             .addShutdownHook(shutdownHook);
-        String channel = inboundConfigured ? config.inputChannelId : null;
-        daemon("Discord Relay outbound", () -> runDiscord(config.botToken, config.webhookUrl, channel)).start();
+        daemon("Discord Relay outbound", () -> runDiscord(config.botToken, config.webhookUrl)).start();
     }
 
     boolean isConfigured() {
@@ -93,7 +93,7 @@ final class DiscordBridge {
         String plain = EnumChatFormatting.getTextWithoutFormattingCodes(text);
         if (plain.trim()
             .isEmpty()) return;
-        offer(new Post(player, plain, PostKind.MESSAGE));
+        offer(new Post(player, plain));
     }
 
     private synchronized void offer(Post post) {
@@ -118,23 +118,22 @@ final class DiscordBridge {
         }
     }
 
-    private void runDiscord(String token, String webhookUrl, String channel) {
+    private void runDiscord(String token, String webhookUrl) {
         try {
-            JDA session = new DiscordBot(this, channel, stopping).connect(token);
+            JDA session = new DiscordBot(this, inputChannelId, stopping).connect(token);
+            if (session == null) return;
+            this.session = session;
             try {
                 drainOutgoing(new DiscordWebhook(session, webhookUrl));
             } finally {
+                this.session = null;
                 session.shutdownNow();
             }
         } catch (InterruptedException failure) {
             Thread.currentThread()
                 .interrupt();
         } catch (RuntimeException | LinkageError failure) {
-            // HTTP exceptions can contain the secret webhook URL.
-            DiscordRelay.LOG.error(
-                "Discord relay worker stopped ({})",
-                failure.getClass()
-                    .getSimpleName());
+            DiscordRelay.LOG.error("Discord relay worker stopped", failure);
         } finally {
             finished.countDown();
             try {
@@ -148,23 +147,19 @@ final class DiscordBridge {
 
     private void drainOutgoing(DiscordWebhook webhook) throws InterruptedException {
         ServerHeartbeat.Phase lastStall = null;
-        boolean reportedStall = false;
         while (!closed || !outgoing.isEmpty()) {
             if (!closed) {
                 ServerHeartbeat.Phase stall = heartbeat.stalled(System.nanoTime());
                 if (stall != lastStall) {
                     lastStall = stall;
-                    if (stall != null) offer(new Post(null, stall.alert, PostKind.STALL));
-                    else offer(new Post(null, "Minecraft server progress resumed.", PostKind.RECOVERY));
+                    server(stall == null ? "Minecraft server progress resumed." : stall.alert);
                 }
             }
             int lost = dropped.getAndSet(0);
             if (lost != 0) DiscordRelay.LOG.warn("Discord Relay queues dropped {} messages", lost);
             Post post = outgoing.poll(1, TimeUnit.SECONDS);
-            if (post == null || (post.kind == PostKind.RECOVERY && !reportedStall)) continue;
-            boolean sent = webhook.send(post.player, post.text);
-            if (post.kind == PostKind.STALL) reportedStall |= sent;
-            else if (post.kind == PostKind.RECOVERY) reportedStall = false;
+            if (post == null) continue;
+            webhook.send(post.player, post.text);
         }
     }
 
@@ -180,10 +175,10 @@ final class DiscordBridge {
     }
 
     void accountCommand(UUID player, String name, boolean link, Consumer<ChatComponentText> reply) {
-        if (link && !inboundConfigured) {
+        if (link && !canLink()) {
             reply.accept(
                 new ChatComponentText(
-                    "Account linking is unavailable because the Discord input channel is not configured."));
+                    "Account linking is unavailable because the Discord bot cannot access the input channel."));
             return;
         }
         accountTask(
@@ -191,6 +186,13 @@ final class DiscordBridge {
             response -> {
                 if (!replies.offer(() -> reply.accept(new ChatComponentText(response)))) dropped.incrementAndGet();
             });
+    }
+
+    private boolean canLink() {
+        JDA current = session;
+        return !closed && current != null
+            && current.getStatus() == JDA.Status.CONNECTED
+            && DiscordBot.findInputChannel(current, inputChannelId) != null;
     }
 
     private void loadAccountLinks(Path linkFile) {
@@ -223,22 +225,14 @@ final class DiscordBridge {
         return thread;
     }
 
-    private enum PostKind {
-        MESSAGE,
-        STALL,
-        RECOVERY
-    }
-
     private static final class Post {
 
         final String player;
         final String text;
-        final PostKind kind;
 
-        Post(String player, String text, PostKind kind) {
+        Post(String player, String text) {
             this.player = player;
             this.text = text;
-            this.kind = kind;
         }
     }
 }

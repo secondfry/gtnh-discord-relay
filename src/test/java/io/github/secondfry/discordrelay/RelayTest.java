@@ -11,8 +11,11 @@ import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Locale;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import net.dv8tion.jda.api.exceptions.InvalidTokenException;
 
@@ -42,7 +45,7 @@ public class RelayTest {
         assertTrue(
             links.redeem(first, stale)
                 .startsWith("Invalid"));
-        assertEquals("Linked to Steve.", links.redeem(first, " " + active + " "));
+        assertEquals("Linked to Steve.", links.redeem(first, " " + active.toUpperCase(Locale.ROOT) + " "));
         assertTrue(
             links.redeem(second, active)
                 .startsWith("Invalid"));
@@ -105,6 +108,28 @@ public class RelayTest {
         assertFalse(DiscordBot.isTransient(new InvalidTokenException()));
     }
 
+    @Test(timeout = 2000)
+    public void retriesLoginBeyondThreeAttemptsAndStopsOnShutdown() throws InterruptedException {
+        AtomicInteger attempts = new AtomicInteger();
+        AtomicInteger waits = new AtomicInteger();
+        CountDownLatch stopping = new CountDownLatch(1) {
+
+            @Override
+            public boolean await(long timeout, TimeUnit unit) {
+                assertEquals(30, unit.toSeconds(timeout));
+                if (waits.incrementAndGet() == 4) countDown();
+                return getCount() == 0;
+            }
+        };
+        DiscordBot bot = new DiscordBot(null, null, stopping);
+        assertNull(bot.connect(() -> {
+            attempts.incrementAndGet();
+            throw new IllegalStateException(new IOException("DNS outage"));
+        }));
+        assertEquals(4, attempts.get());
+        assertEquals(4, waits.get());
+    }
+
     @Test
     public void generatesBlankSettingsAndLoadsEditedValues() throws Exception {
         Field minecraftHome = FMLInjectionData.class.getDeclaredField("minecraftHome");
@@ -130,7 +155,7 @@ public class RelayTest {
         assertEquals(configDirectory.resolve("links.properties"), blank.linksFile);
         assertFalse(Files.exists(blank.linksFile));
 
-        String webhook = "https://discord.com/api/webhooks/123456789012345678/mock_token";
+        String webhook = "https://canary.discordapp.com/api/v10/webhooks/123456789012345678/mock_token";
         String values = "general {\n    S:botToken= test-bot-token  \n    S:webhookUrl=" + webhook
             + "\n    S:inputChannelId= 123456789012345679\n}\n";
         Files.write(settingsFile, values.getBytes(StandardCharsets.UTF_8));

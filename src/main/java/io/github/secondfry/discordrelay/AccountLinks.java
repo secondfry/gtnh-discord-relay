@@ -9,6 +9,7 @@ import java.nio.file.StandardCopyOption;
 import java.security.SecureRandom;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
@@ -75,7 +76,8 @@ final class AccountLinks {
 
     String redeem(String discord, String code) {
         clearCodes(null);
-        String normalizedCode = code.trim();
+        String normalizedCode = code.trim()
+            .toLowerCase(Locale.ROOT);
         PendingCode pending = codes.get(normalizedCode);
         if (pending == null) return "Invalid or expired code. Use /link in Minecraft.";
         if (saved.containsKey(discord) || discordFor(pending.player) != null) {

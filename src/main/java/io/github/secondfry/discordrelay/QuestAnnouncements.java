@@ -3,14 +3,12 @@ package io.github.secondfry.discordrelay;
 import java.util.UUID;
 import java.util.function.Predicate;
 
-import net.minecraft.util.StatCollector;
-
 import betterquesting.api.api.ApiReference;
 import betterquesting.api.api.QuestingAPI;
 import betterquesting.api.events.QuestEvent;
 import betterquesting.api.properties.NativeProps;
 import betterquesting.api.questing.IQuest;
-import betterquesting.api.utils.UuidConverter;
+import betterquesting.api2.utils.QuestTranslation;
 import cpw.mods.fml.common.eventhandler.SubscribeEvent;
 
 public final class QuestAnnouncements {
@@ -38,7 +36,8 @@ public final class QuestAnnouncements {
                 IQuest quest = QuestingAPI.getAPI(ApiReference.QUEST_DB)
                     .get(id);
                 if (quest == null || Boolean.TRUE.equals(quest.getProperty(NativeProps.SILENT))) continue;
-                String name = questName(id, quest);
+                String name = QuestTranslation.translateQuestName(id, quest);
+                if (name == null || name.isEmpty()) name = id.toString();
                 bridge.server(player + " completed quest [" + name + "].");
             }
         } catch (LinkageError | RuntimeException failure) {
@@ -47,11 +46,4 @@ public final class QuestAnnouncements {
         }
     }
 
-    private static String questName(UUID id, IQuest quest) {
-        String key = "betterquesting.quest." + UuidConverter.encodeUuidStripPadding(id) + ".name";
-        String name = quest.getProperty(NativeProps.NAME);
-        if (StatCollector.canTranslate(key)) name = StatCollector.translateToLocal(key);
-        else if (name != null && StatCollector.canTranslate(name)) name = StatCollector.translateToLocal(name);
-        return name == null || name.isEmpty() ? id.toString() : name;
-    }
 }

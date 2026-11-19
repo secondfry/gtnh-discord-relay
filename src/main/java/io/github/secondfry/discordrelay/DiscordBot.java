@@ -5,6 +5,7 @@ import java.util.EnumSet;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.function.Supplier;
 
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.JDABuilder;
@@ -26,7 +27,7 @@ import net.dv8tion.jda.api.requests.GatewayIntent;
 
 final class DiscordBot extends ListenerAdapter {
 
-    private static final int ATTEMPTS = 3;
+    private static final long LOGIN_RETRY_SECONDS = 30;
 
     private final DiscordBridge bridge;
     private final String channelId;
@@ -45,16 +46,25 @@ final class DiscordBot extends ListenerAdapter {
     JDA connect(String token) throws InterruptedException {
         EnumSet<GatewayIntent> intents = channelId == null ? EnumSet.noneOf(GatewayIntent.class)
             : EnumSet.of(GatewayIntent.GUILD_MESSAGES, GatewayIntent.MESSAGE_CONTENT);
-        for (int attempt = 1;; attempt++) {
+        return connect(
+            () -> JDABuilder.createLight(token, intents)
+                .setEnableShutdownHook(false)
+                .addEventListeners(this)
+                .build());
+    }
+
+    JDA connect(Supplier<JDA> login) throws InterruptedException {
+        while (!isStopping()) {
             try {
-                return JDABuilder.createLight(token, intents)
-                    .setEnableShutdownHook(false)
-                    .addEventListeners(this)
-                    .build();
+                return login.get();
             } catch (RuntimeException failure) {
-                if (attempt == ATTEMPTS || !isTransient(failure) || stopping.await(2, TimeUnit.SECONDS)) throw failure;
+                if (!isTransient(failure)) throw failure;
+                if (isStopping()) return null;
+                DiscordRelay.LOG.warn("Discord login failed. Retrying in {} seconds.", LOGIN_RETRY_SECONDS);
+                if (stopping.await(LOGIN_RETRY_SECONDS, TimeUnit.SECONDS)) return null;
             }
         }
+        return null;
     }
 
     static boolean isTransient(Throwable failure) {
@@ -74,8 +84,7 @@ final class DiscordBot extends ListenerAdapter {
     @Override
     public void onReady(ReadyEvent event) {
         if (channelId == null || isStopping()) return;
-        GuildMessageChannel target = event.getJDA()
-            .getTextChannelById(channelId);
+        GuildMessageChannel target = findInputChannel(event.getJDA(), channelId);
         if (target == null) {
             DiscordRelay.LOG.error("Discord Relay cannot see the configured Discord text channel.");
             return;
@@ -86,6 +95,15 @@ final class DiscordBot extends ListenerAdapter {
             Commands.slash("link", "Link your Minecraft account")
                 .addOption(OptionType.STRING, "code", "Code from /link in Minecraft", true));
         register(guild, Commands.slash("unlink", "Unlink your Minecraft account"));
+    }
+
+    static GuildMessageChannel findInputChannel(JDA session, String channelId) {
+        if (channelId == null) return null;
+        GuildMessageChannel channel = session.getTextChannelById(channelId);
+        if (channel == null) return null;
+        return channel.getGuild()
+            .getSelfMember()
+            .hasAccess(channel) ? channel : null;
     }
 
     private void register(Guild guild, CommandData command) {

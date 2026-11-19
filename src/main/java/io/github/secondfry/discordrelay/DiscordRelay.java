@@ -10,7 +10,6 @@ import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.stats.StatisticsFile;
 import net.minecraft.util.ChatComponentText;
-import net.minecraft.world.GameRules;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.common.util.FakePlayer;
 import net.minecraftforge.event.ServerChatEvent;
@@ -179,8 +178,6 @@ public final class DiscordRelay {
         if (!(event.entityLiving instanceof EntityPlayerMP)) return;
         EntityPlayerMP player = (EntityPlayerMP) event.entityLiving;
         if (!isPublic(player, false)) return;
-        GameRules rules = player.worldObj.getGameRules();
-        if (rules.hasRule("showDeathMessages") && !rules.getGameRuleBooleanValue("showDeathMessages")) return;
         bridge.server(
             player.func_110142_aN()
                 .func_151521_b()
