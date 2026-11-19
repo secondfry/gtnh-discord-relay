@@ -1,0 +1,9 @@
+{
+  "required": true,
+  "minVersion": "0.8.3-GTNH",
+  "package": "io.github.secondfry.discordrelay.mixin",
+  "refmap": "mixins.discordrelay.refmap.json",
+  "target": "@env(DEFAULT)",
+  "compatibilityLevel": "JAVA_8",
+  "server": ["ServerLoopMixin"]
+}

@@ -1,109 +1,29 @@
-# Example Forge Mod for Minecraft 1.7.10
+# Discord Relay for GTNH
 
-[![](https://jitpack.io/v/GTNewHorizons/ExampleMod1.7.10.svg)](https://jitpack.io/#GTNewHorizons/ExampleMod1.7.10)
-[![](https://github.com/GTNewHorizons/ExampleMod1.7.10/actions/workflows/build-and-test.yml/badge.svg)](https://github.com/GTNewHorizons/ExampleMod1.7.10/actions/workflows/build-and-test.yml)
+Server-side mod for GT New Horizons 2.9.0 dedicated servers. Minecraft chat appears in Discord under the player's Minecraft username with their Minotar head. Achievements, BetterQuesting completions, deaths, joins, leaves, ServerUtilities AFK transitions, and server status use the webhook name **Minecraft Server**. Human text messages from the configured Discord channel appear in Minecraft. Bot messages, webhooks, Discord system messages, and attachment-only messages are ignored.
 
-An example mod for Minecraft 1.7.10 with Forge focussed on a stable, updatable setup.
+## Setup
 
-<!-- omit in toc -->
-### Table of Contents
+1. Download the JAR from the [latest GitHub release](https://github.com/secondfry/gtnh-discord-relay/releases/latest) and put it in the dedicated server's `mods/` directory.
+2. Create a webhook in the Discord channel where you want Minecraft posts and create a bot in the Discord Developer Portal. For Discord-to-Minecraft chat and linking, enable **Message Content Intent** and install the bot with the `bot` and `applications.commands` scopes. Give it **View Channel** in your incoming chat channel. The webhook may post to a different channel.
+3. Start the server once to generate `config/discordrelay/settings.cfg`. Fill in the `general` section and restart the server. Keep the token and webhook URL private.
 
-* [Example Forge Mod for Minecraft 1.7.10](#example-forge-mod-for-minecraft-1710)
-    * [Motivation](#motivation)
-    * [Help! I'm stuck!](#help-im-stuck)
-    * [Getting started](#getting-started)
-    * [Features](#features)
-    * [Files](#files)
-    * [Forge's Access Transformers](#forges-access-transformers)
-    * [Mixins](#mixins)
-    * [Advanced](#advanced)
-    * [Feedback wanted](#feedback-wanted)
+   | Setting | Value |
+   | --- | --- |
+   | `botToken` | Required. Bot token |
+   | `webhookUrl` | Required. `https://discord.com/api/webhooks/<id>/<token>` |
+   | `inputChannelId` | Optional. Discord input text channel ID |
 
+Run `/link` in Minecraft, then `/link code:<code>` in the relay channel. Codes are private, single-use and expire in five minutes. Run `/unlink` on either side. Messages marked `[Discord linked]` use the Minecraft name recorded at link time. Other Discord chat uses the sender's Discord display name. Links are stored in `config/discordrelay/links.properties`. Use an authenticated Minecraft server if players rely on the linked identity.
 
-### Motivation
+## Delivery
 
-We had our fair share in struggles with build scripts for Minecraft Forge. There are quite a few pitfalls from non-obvious error messages. This Example Project provides you a build system you can adapt to over 90% of Minecraft Forge mods and can easily be updated if need be.
+Discord I/O, account storage, and watchdog reporting run off the Minecraft thread. The server tick drains a bounded inbound queue. One outbound worker uses the bot's JDA instance to send webhook posts in queue order. JDA handles Discord rate limits, retries, and request failure logs. The JVM waits up to 20 seconds for the outbound queue to drain at shutdown. Posts, including the final notice, can be dropped when the queue is full or the JVM exits. Pings from webhook content are disabled.
 
-### Help! I'm stuck!
+If the JVM exits before Forge reports a final status, the relay queues “Minecraft JVM is shutting down.” Silent quests, events from fake players, and muted chat canceled by ServerUtilities are skipped. Vanished players’ events are hidden, with public chat relayed only if ServerUtilities allows it. With blank settings the mod stays idle. Outbound delivery requires a valid webhook URL and successful bot initialization. If the input channel ID is missing or invalid, only outbound delivery starts and `/link` reports that linking is unavailable. A terminal bot shutdown also stops webhook delivery. If Discord rejects an unauthorized or deleted webhook, outbound delivery stays disabled until restart. Forge captures JDA’s diagnostics under `STDERR` in the server log.
 
-We all have been there! Check out our [FAQ](https://github.com/GTNewHorizons/ExampleMod1.7.10/blob/main/docs/FAQ.md). If that doesn't help, please open an issue.
+The watchdog monitors the server loop during normal gameplay and ServerUtilities' pause-when-empty mode. It alerts after 120 seconds during world startup and 30 seconds while running or shutting down. Crash alerts cover unexpected exits through Forge's server lifecycle. A hard kill, host outage, JVM fatal error, or crash before the relay initializes requires an external monitor.
 
-### Getting started
+BetterQuesting and ServerUtilities hooks were built against the GTNH 2.9.0 versions. See [event sources](docs/event-sources.md).
 
-> [!WARNING]
-> Do not clone or fork this repository when creating a new mod. It contains files that are specific to this example project and are not part of the mod template. Use the [project starter](https://github.com/GTNewHorizons/ExampleMod1.7.10/releases/download/master-packages/starter.zip) instead.
-
-Creating mod from scratch:
-1. Unzip [project starter](https://github.com/GTNewHorizons/ExampleMod1.7.10/releases/download/master-packages/starter.zip) into project directory.
-2. Replace placeholders in LICENSE-template and rename it to LICENSE, or remove LICENSE-template and put any other license you like on your code. This is an permissive OSS project and we encourage you participate in OSS movement by having permissive license like one in template. You can find out pros and cons of OSS software in [this article](https://www.freecodecamp.org/news/what-is-great-about-developing-open-source-and-what-is-not/)
-3. Ensure your project is under VCS. For example initialise git repository by running `git init; git commit --message "initialized repository"`.
-4. Replace placeholders (edit values in gradle.properties, change example package and class names, etc.)
-5. Run `./gradlew setupDecompWorkspace`
-6. Run `./gradlew build`
-6. Make sure to check out the rest sections of this file.
-7. You are good to go!
-
-We also have described guidelines for existing mod [migration](docs/migration.md) and [porting](docs/porting.md)
-
-### Features
-
- - Updatable: Replace [`build.gradle`](https://github.com/GTNewHorizons/ExampleMod1.7.10/blob/main/build.gradle) with a newer version
- - Optional API artifact (.jar)
- - Optional version replacement in Java files
- - Optional shadowing of dependencies
- - Simplified setup of Mixin and example
- - Scala support (add sources under `src/main/scala/` instead of `src/main/java/`)
- - Optional named developer account for consistent player progression during testing
- - Boilerplate forge mod as starting point
- - Improved warnings for pitfalls
- - Git Tags integration for versioning
- - [Jitpack](https://jitpack.io) CI
- - GitHub CI:
-   - Releasing your artifacts on new tags pushed. Push git tag named after version (e.g. 1.0.0) which will trigger a release of artifacts with according names.
-   - Running smoke test for server startup. On any server crash occurring workflow will fail and print the crash log.
-
-### Files
- - [`build.gradle`](https://github.com/GTNewHorizons/ExampleMod1.7.10/blob/main/build.gradle): This is the core script of the build process. You should not need to tamper with it, unless you are trying to accomplish something out of the ordinary. __Do not touch this file! You will make a future update near impossible if you do so!__
- - [`gradle.properties`](https://github.com/GTNewHorizons/ExampleMod1.7.10/blob/main/gradle.properties): The core configuration file. It includes
- - [`dependencies.gradle[.kts]`](https://github.com/GTNewHorizons/ExampleMod1.7.10/blob/main/dependencies.gradle): Add your mod's dependencies in this file. This is separate from the main build script, so you may replace the [`build.gradle`](https://github.com/SinTh0r4s/ExampleMod1.7.10/blob/main/build.gradle) if an update is available.
- - [`repositories.gradle[.kts]`](https://github.com/GTNewHorizons/ExampleMod1.7.10/blob/main/repositories.gradle): Add your dependencies' repositories. This is separate from the main build script, so you may replace the [`build.gradle`](https://github.com/SinTh0r4s/ExampleMod1.7.10/blob/main/build.gradle) if an update is available.
- - `addon.gradle[.kts]`: Any additional build logic. This is separate from the main build script, so you may replace the [`build.gradle`](https://github.com/SinTh0r4s/ExampleMod1.7.10/blob/main/build.gradle) if an update is available. See [Advanced](#advanced) for more details.
- - [`jitpack.yml`](https://github.com/GTNewHorizons/ExampleMod1.7.10/blob/main/jitpack.yml): Ensures that your mod is available as import over [Jitpack](https://jitpack.io).
- - [`.github/workflows/gradle.yml`](https://github.com/GTNewHorizons/ExampleMod1.7.10/blob/main/.github/workflows/gradle.yml): A simple CI script that will build your mod any time it is pushed to `master` or `main` and publish the result as release in your repository. This feature is free with GitHub if your repository is public.
-
-### Forge's Access Transformers
-
-You may activate Forge's Access Transformers by defining a configuration file in `gradle.properties`.
-
-Check out the [`example-access-transformers`](https://github.com/GTNewHorizons/ExampleMod1.7.10/tree/example-access-transformers) branch for a working example!
-
-> [!WARNING]
-> Access Transformers are bugged and will deny you any sources for the decompiled Minecraft! Your development environment will still work, but you might face some inconveniences. For example, IntelliJ will not permit searches in dependencies without attached sources.
-
-### Mixins
-
-[Mixins](https://github.com/SpongePowered/Mixin) are used to modify vanilla or mod/library code during runtime without having to edit, recompile, and redistribute the original code. For example, mixins can change a hardcoded value, redirect a method call, inject additional code, access private fields/methods, make a class implement your interface, and more. Mixins are an advanced feature which most normal mods will not require.
-
-Documentation about Mixin features can be found here: [Mixin Wiki](https://github.com/SpongePowered/Mixin/wiki) and [MixinExtras Wiki](https://github.com/LlamaLad7/MixinExtras/wiki)
-
-There are many examples of mixins in these mods: [Hodgepodge](https://github.com/GTNewHorizons/Hodgepodge) and [Angelica](https://github.com/GTNewHorizons/Angelica)
-
-To enable Mixins in your project, follow one of the example commits:
-- use [normal mixins](https://github.com/GTNewHorizons/ExampleMod1.7.10/commit/beba55615fa8337b7639f0d5b18db6cc8d4826be) for basic and quick registration
-- use [GTNH IMixins](https://github.com/GTNewHorizons/ExampleMod1.7.10/commit/055cd4f18765a421a86c706f53b62116988297e3) (recommended) for the same thing as below, but in a less verbose and more unified manner using the IMixins api
-- use [GTNH Early/Late mixins](https://github.com/GTNewHorizons/ExampleMod1.7.10/commit/c4df59d92164775b69451f3e690239e93d1fc979) to have full control over the registration logic and check for presence of other mods during runtime to load your mixins
-
-The extra required dependencies are handled automatically after mixins are enabled.
-
-### Advanced
-
-If your project requires custom gradle commands you may add a `addon.gradle[.kts]` to your project. It will be added automatically to the build script. Although we recommend against it, it is sometimes required. When in doubt, feel free to ask us about it. You may break future updates of this build system!
-If you need access to properties modified later in the buildscript, you can also use a `addon.late.gradle[.kts]`.
-For local tweaks that you don't want to commit to Git, like adding extra JVM arguments for testing, use `addon[.late].local.gradle[.kts]`.
-
-### Feedback wanted
-
-If you tried out this build script we would love to head your opinion! Is there any feature missing for you? Did something not work? Please open an issue and we will try to resolve it asap!
-
-Happy modding,\
-[SinTh0r4s](https://github.com/SinTh0r4s), [TheElan](https://github.com/TheElan) and [basdxz](https://github.com/basdxz)
+The relay source is [MIT-licensed](LICENSE.md). Bundled JDA dependencies retain their own licenses and notices in the JAR, including [GNU Trove](src/main/resources/META-INF/discordrelay-licenses/Trove.txt).

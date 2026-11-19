@@ -1,0 +1,12 @@
+GNU Trove (net.sf.trove4j:core:3.1.0) is included under LGPL 2.1.
+The build relocates its package names. The LGPL text is included next to this notice.
+
+Corresponding library source:
+https://repo.maven.apache.org/maven2/net/sf/trove4j/core/3.1.0/core-3.1.0-sources.jar
+
+The relay's source and Gradle build are available here:
+https://github.com/secondfry/gtnh-discord-relay
+
+To rebuild with a modified Trove, add `exclude group: "net.sf.trove4j", module: "core"`
+inside the JDA dependency block in dependencies.gradle. Add your library JAR with
+`shadowImplementation(files("path/to/modified-trove.jar"))`, then run ./gradlew build.

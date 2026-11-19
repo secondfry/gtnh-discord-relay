@@ -34,5 +34,12 @@
  * For more details, see https://docs.gradle.org/8.0.1/userguide/java_library_plugin.html#sec:java_library_configurations_graph
  */
 dependencies {
-    //runtimeOnlyNonPublishable("com.github.GTNewHorizons:NotEnoughItems:2.7.69-GTNH:dev")
+    shadowImplementation("net.dv8tion:JDA:6.7.0") {
+        exclude group: "club.minnced", module: "opus-java"
+        exclude group: "com.google.crypto.tink", module: "tink"
+    }
+    shadowImplementation("org.slf4j:slf4j-simple:2.0.19")
+    compileOnly("com.github.GTNewHorizons:BetterQuesting:3.8.92-GTNH:dev") { transitive = false }
+    compileOnly("com.github.GTNewHorizons:ServerUtilities:2.4.22:dev") { transitive = false }
+    testImplementation("junit:junit:4.13.2")
 }
