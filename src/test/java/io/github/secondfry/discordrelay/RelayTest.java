@@ -179,4 +179,13 @@ public class RelayTest {
     private static String code(String reply) {
         return reply.split("code:", 2)[1].split(" ", 2)[0];
     }
+
+    @Test
+    public void stripsFormattingCodesWithoutClientOnlyMinecraftApi() {
+        // Regression: EnumChatFormatting.getTextWithoutFormattingCodes does not exist on dedicated servers.
+        assertEquals(
+            "How to Get Sodium",
+            DiscordBridge.FORMATTING_CODE.matcher("§2§lHow to Get §RSodium")
+                .replaceAll(""));
+    }
 }

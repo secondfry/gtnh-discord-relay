@@ -12,14 +12,16 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.regex.Pattern;
 
 import net.dv8tion.jda.api.JDA;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.util.ChatComponentText;
-import net.minecraft.util.EnumChatFormatting;
 
 final class DiscordBridge {
 
+    // EnumChatFormatting.getTextWithoutFormattingCodes is @SideOnly(CLIENT) and missing on dedicated servers.
+    static final Pattern FORMATTING_CODE = Pattern.compile("(?i)\u00a7[0-9a-fk-or]");
     private static final String BUSY = "Discord relay is busy or stopping. Try again later.";
     private final BlockingQueue<Post> outgoing = new ArrayBlockingQueue<>(256);
     private final BlockingQueue<ChatComponentText> incoming = new ArrayBlockingQueue<>(128);
@@ -90,7 +92,8 @@ final class DiscordBridge {
     }
 
     private void offer(String player, String text) {
-        String plain = EnumChatFormatting.getTextWithoutFormattingCodes(text);
+        String plain = FORMATTING_CODE.matcher(text)
+            .replaceAll("");
         if (plain.trim()
             .isEmpty()) return;
         offer(new Post(player, plain));
