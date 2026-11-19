@@ -1,6 +1,6 @@
 # Discord Relay for GTNH
 
-Server-side mod for GT New Horizons 2.9.0 dedicated servers. Minecraft chat appears in Discord under the player's Minecraft username with their Minotar head. Achievements, BetterQuesting completions, deaths, joins, leaves, ServerUtilities AFK transitions, and server status use the webhook name **Minecraft Server**. Human text messages from the configured Discord channel appear in Minecraft. Bot messages, webhooks, Discord system messages, and attachment-only messages are ignored.
+Server-side mod for GT New Horizons 2.9.0 dedicated servers. Minecraft chat appears in Discord under the player's Minecraft username with their Minotar head. Achievements, BetterQuesting completions, deaths, joins, leaves, ServerUtilities AFK transitions, AdvancedBackups backup status, and server status use the webhook name **Minecraft Server**. Human text messages from the configured Discord channel appear in Minecraft. Bot messages, webhooks, Discord system messages, and attachment-only messages are ignored.
 
 ## Setup
 
@@ -34,6 +34,6 @@ With blank settings the mod stays idle. Outbound delivery requires a valid webho
 
 The watchdog monitors the server loop during normal gameplay and ServerUtilities' pause-when-empty mode. It alerts after 120 seconds during world startup and 30 seconds while running or shutting down. Crash alerts cover unexpected exits through Forge's server lifecycle. A hard kill, host outage, JVM fatal error, or crash before the relay initializes requires an external monitor.
 
-BetterQuesting and ServerUtilities hooks were built against the GTNH 2.9.0 versions. See [event sources](docs/event-sources.md).
+BetterQuesting and ServerUtilities hooks were built against the GTNH 2.9.0 versions. See [event sources](docs/event-sources.md). Backup status needs AdvancedBackups `logging.clients` set to `all` or `ops`; with `none` AdvancedBackups reports nothing to relay.
 
 The relay source is [MIT-licensed](LICENSE.md). Bundled JDA dependencies retain their own licenses and notices in the JAR, including [GNU Trove](src/main/resources/META-INF/discordrelay-licenses/Trove.txt).

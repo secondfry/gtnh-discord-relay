@@ -41,5 +41,7 @@ dependencies {
     shadowImplementation("org.slf4j:slf4j-simple:2.0.19")
     compileOnly("com.github.GTNewHorizons:BetterQuesting:3.8.92-GTNH:dev") { transitive = false }
     compileOnly("com.github.GTNewHorizons:ServerUtilities:2.4.22:dev") { transitive = false }
+    compileOnly("secondfry:AdvancedBackups:4.3.0") { transitive = false }
+    testImplementation("secondfry:AdvancedBackups:4.3.0") { transitive = false }
     testImplementation("junit:junit:4.13.2")
 }

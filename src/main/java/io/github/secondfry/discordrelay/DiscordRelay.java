@@ -107,6 +107,8 @@ public final class DiscordRelay {
     public void started(FMLServerStartedEvent event) {
         if (bridge == null) return;
         heartbeat.enter(ServerHeartbeat.Phase.RUNNING, System.nanoTime());
+        // AdvancedBackups sets its contactor in FMLServerStartingEvent, so every mod's starting handler has run by now.
+        if (Loader.isModLoaded("advancedbackups")) BackupNotifications.install(bridge);
         bridge.server("Minecraft server started.");
     }
 

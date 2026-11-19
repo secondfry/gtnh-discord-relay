@@ -1,5 +1,11 @@
 // Add any additional repositories for your dependencies here.
 
 repositories {
-
+    // AdvancedBackups publishes no Maven artifact; resolve the fork's GitHub release JAR for compileOnly use.
+    ivy {
+        url = "https://github.com/"
+        patternLayout { artifact("[organisation]/[module]/releases/download/v[revision]/[module]-forge-1.7.10-[revision].[ext]") }
+        metadataSources { artifact() }
+        content { includeModule("secondfry", "AdvancedBackups") }
+    }
 }
