@@ -6,6 +6,14 @@ Server-side mod for GT New Horizons 2.9.0 dedicated servers. Minecraft chat appe
 
 1. Download the JAR from the [latest GitHub release](https://github.com/secondfry/gtnh-discord-relay/releases/latest) and put it in the dedicated server's `mods/` directory.
 2. Create a webhook in the Discord channel where you want Minecraft posts and create a bot in the Discord Developer Portal. If you set an input channel ID, enable **Message Content Intent**, install the bot with the `bot` and `applications.commands` scopes, and grant it **View Channel** there. If the intent is disabled, Discord rejects the connection with code 4014 and webhook delivery also stops. The webhook may post to a different channel.
+
+   Invite the bot with this link, replacing `<APPLICATION_ID>` with the Application ID from Developer Portal → your app → General Information:
+
+   ```
+   https://discord.com/oauth2/authorize?client_id=<APPLICATION_ID>&scope=bot%20applications.commands&permissions=1024
+   ```
+
+   `permissions=1024` is View Channel only, which is all the relay needs: slash-command replies are ephemeral and outbound messages go through the webhook. If a channel override hides the channel from the bot's role, allow View Channel there. If the relay logs "cannot see the configured Discord text channel", the bot is not in the server, lacks View Channel, or `inputChannelId` is wrong.
 3. Start the server once to generate `config/discordrelay/settings.cfg`. Fill in the `general` section and restart the server. Keep the token and webhook URL private.
 
    | Setting | Value |
