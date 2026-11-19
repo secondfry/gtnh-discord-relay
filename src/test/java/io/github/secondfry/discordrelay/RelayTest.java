@@ -181,11 +181,16 @@ public class RelayTest {
     }
 
     @Test
-    public void stripsFormattingCodesWithoutClientOnlyMinecraftApi() {
-        // Regression: EnumChatFormatting.getTextWithoutFormattingCodes does not exist on dedicated servers.
+    public void stripsFormattingCodesLikeVanilla() {
+        // Pins vanilla's (?i)§[0-9A-FK-OR] pattern (vanilla's stripper is client-only, so the dev env
+        // can't reproduce the dedicated-server crash).
         assertEquals(
             "How to Get Sodium",
             DiscordBridge.FORMATTING_CODE.matcher("§2§lHow to Get §RSodium")
+                .replaceAll(""));
+        assertEquals(
+            "a§zb§",
+            DiscordBridge.FORMATTING_CODE.matcher("a§zb§")
                 .replaceAll(""));
     }
 }
